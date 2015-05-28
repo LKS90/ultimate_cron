@@ -10,6 +10,7 @@ namespace Drupal\ultimate_cron\Form;
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\ultimate_cron\CronJobHelper;
+use Drupal\ultimate_cron\CronRule;
 use Drupal\ultimate_cron\Entity\CronJob;
 
 /**
@@ -154,6 +155,18 @@ class CronJobForm extends EntityForm {
 
   /**
    * {@inheritdoc}
+   */
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    $rule = $form_state->getValues()['scheduler']['configuration']['rules'][0];
+    $cron = CronRule::factory($rule);
+    if (!$cron->isValid()) {
+      $form_state->setErrorByName('scheduler_settings', 'Rule is invalid');
+    }
+    parent::validateForm($form, $form_state);
+  }
+
+  /**
+   * Overrides Drupal\Core\Entity\EntityForm::save().
    */
   public function save(array $form, FormStateInterface $form_state) {
     $job = $this->entity;

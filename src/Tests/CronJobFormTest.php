@@ -133,13 +133,15 @@ class CronJobFormTest extends WebTestBase {
       'title' => 'Test Job',
       'id' => strtolower($this->randomMachineName()),
       'scheduler[id]' => 'crontab',
+      'scheduler[configuration][rules][0]' => '*/15+@ *-2 * * *',
     );
-
-    // Save new job.
     $this->drupalPostForm(NULL, $job_configuration, t('Save'));
-    $this->clickLink(t('Edit'), 1);
-    $this->drupalPostForm(NULL, ['scheduler[configuration][rules][0]' => '0+@ * * * *'], t('Save'));
-    $this->assertText('Rule: 0+@ * * * *');
+
+    // Try editing the rule to an invalid one.
+    $this->clickLink('Edit');
+    $this->drupalPostForm(NULL, ['scheduler[configuration][rules][0]' => '*//15+@ *-2 * * *'], t('Save'));
+    $this->assertText('Rule is invalid');
+    $this->assertTitle('Edit job | Drupal');
   }
 
 }
