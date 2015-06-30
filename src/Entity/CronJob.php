@@ -292,6 +292,11 @@ class CronJob extends ConfigEntityBase implements CronJobInterface {
    * Invoke the jobs callback.
    */
   public function invoke() {
+    if (!is_callable($this->getCallback())) {
+      $this->getPlugin('logger')
+        ->create($this->id(), '', t('The callback "@callback" for the cron job "@label" is invalid.', ['@callback' => $this->callback, '@label' => $this->getTitle()]), ULTIMATE_CRON_LOG_TYPE_ADMIN);
+      throw new Exception(t('The callback "@callback" for the cron job "@label" is invalid.', ['@callback' => $this->callback, '@label' => $this->getTitle()]));
+    }
     try {
       CronPlugin::hook_cron_pre_invoke($this);
       \Drupal::moduleHandler()->invokeAll('cron_pre_invoke', array($this));

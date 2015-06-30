@@ -21,7 +21,7 @@ class CronJobFormTest extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('ultimate_cron', 'block');
+  public static $modules = array('ultimate_cron', 'dblog', 'block');
 
   /**
    * A user with permission to create and edit books and to administer blocks.
@@ -133,13 +133,39 @@ class CronJobFormTest extends WebTestBase {
       'title' => 'Test Job',
       'id' => strtolower($this->randomMachineName()),
       'scheduler[id]' => 'crontab',
+      'scheduler[configuration][rules][0]' => '0+@ * * * *',
     );
 
     // Save new job.
     $this->drupalPostForm(NULL, $job_configuration, t('Save'));
-    $this->clickLink(t('Edit'), 1);
-    $this->drupalPostForm(NULL, ['scheduler[configuration][rules][0]' => '0+@ * * * *'], t('Save'));
     $this->assertText('Rule: 0+@ * * * *');
+  }
+
+
+  /**
+   * Tests if running jobs with missing plugins is properly handled.
+   */
+  protected function testMissingCron() {
+    $this->admin_user = $this->drupalCreateUser(array('administer ultimate cron', 'access site reports'));
+    $this->drupalLogin($this->admin_user);
+
+    $values = array(
+      'title' => 'Fail cron job',
+      'id' => 'ultimate_cron_fake_job',
+      'module' => 'ultimate_cron_fake',
+      'callback' => 'missing_cron',
+    );
+
+    $job = entity_create('ultimate_cron_job', $values);
+    $job->save();
+
+    // Run cron manually for the first time.
+    \Drupal::service('cron')->run();
+    $this->drupalGet('admin/reports/dblog');
+    $this->assertLinkByHref('/admin/reports/dblog/event/3', 0, 'Found exception in recent log entries.');
+    $this->clickLink('Error running ultimate_cron_fake_job: The callback …');
+    $message = (string) $this->xpath('/html/body/div/main/div/div/table/tbody/tr[6]')[0]->td;
+    $this->assertEqual($message, 'Error running ultimate_cron_fake_job: The callback "missing_cron" for the cron job "Fail cron job" is invalid.', 'Found the error message.');
   }
 
 }
