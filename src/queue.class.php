@@ -24,10 +24,10 @@ class QueueSettings extends TaggedSettings {
    *   Cron queue definitions.
    */
   private function get_queues() {
+    $queues = [];
     if (!isset(self::$queues)) {
-      $queues = array();
-      foreach (module_implements('cron_queue_info') as $module) {
-        $items = module_invoke($module, 'cron_queue_info');
+      foreach (\Drupal::moduleHandler()->getImplementations('cron_queue_info') as $module) {
+        $items = \Drupal::moduleHandler()->invoke($module, 'cron_queue_info', $args = []);
         if (is_array($items)) {
           foreach ($items as &$item) {
             $item['module'] = $module;
@@ -35,7 +35,7 @@ class QueueSettings extends TaggedSettings {
           $queues += $items;
         }
       }
-      drupal_alter('cron_queue_info', $queues);
+      \Drupal::moduleHandler()->alter('cron_queue_info', $queues);
       self::$queues = $queues;
     }
     return $queues;
@@ -45,8 +45,8 @@ class QueueSettings extends TaggedSettings {
    * Implements hook_cronapi().
    */
   public function cronapi() {
-    $items = array();
-    if (!variable_get($this->key . '_enabled', TRUE)) {
+    $items = [];
+    if (!\Drupal::config('ultimate_cron')->get($this->key . '_enabled')) {
       return $items;
     }
 
@@ -96,7 +96,7 @@ class QueueSettings extends TaggedSettings {
    */
   static public function worker_callback($job) {
     $settings = $job->getPluginSettings('settings');
-    $queue = DrupalQueue::get($settings['queue']['name']);
+    $queue = Drupal::queue($settings['queue']['name']);
     $function = $settings['queue']['worker callback'];
 
     $end = microtime(TRUE) + $settings['queue']['time'];
@@ -172,7 +172,14 @@ class QueueSettings extends TaggedSettings {
             $hook['name'] = $name;
             $hook['title'] .= " (#$i)";
             $hook['immutable'] = TRUE;
-            $new_jobs[$name] = ultimate_cron_prepare_job($name, $hook);
+            debug($hook);
+            $values = [
+              'title' => $hook['title'],
+              'id' => $hook['name'],
+              'module' => $name,
+              'callback' => $hook,
+            ];
+            $new_jobs[$name] = CronJob::create($values);
             $new_jobs[$name]->settings = $settings + $new_jobs[$name]->settings;
             $new_jobs[$name]->title = $job->title . " (#$i)";
           }
@@ -199,7 +206,7 @@ class QueueSettings extends TaggedSettings {
    * Default settings.
    */
   public function defaultSettings() {
-    return array(
+    return [
       'lease_time' => 30,
       'empty_delay' => 0,
       'item_delay' => 0,
@@ -207,7 +214,7 @@ class QueueSettings extends TaggedSettings {
       'threads' => 4,
       'threshold' => 10,
       'time' => 15,
-    );
+    ];
   }
 
   /**
@@ -223,7 +230,7 @@ class QueueSettings extends TaggedSettings {
         '#title' => t('Enable cron queue processing'),
         '#description' => t('If enabled, cron queues will be processed by this plugin. If another cron queue plugin is installed, it may be necessary/beneficial to disable this plugin.'),
         '#type' => 'checkbox',
-        '#default_value' => variable_get($this->key . '_enabled', TRUE),
+        '#default_value' => \Drupal::config('ultimate_cron')->get($this->key . '_enabled'),
         '#fallback' => TRUE,
       );
       $states = array(
@@ -332,7 +339,7 @@ class QueueSettings extends TaggedSettings {
   public function settingsFormSubmit(&$form, &$form_state, $job = NULL) {
     if (!$job) {
       $values = &$form_state['values']['settings'][$this->type][$this->name];
-      variable_set($this->key . '_enabled', $values['enabled']);
+      \Drupal::config('ultimate_cron')->set($this->key . '_enabled', $values['enabled'])->save();
       unset($values['enabled']);
     }
   }
@@ -341,25 +348,27 @@ class QueueSettings extends TaggedSettings {
    * Throttle queues.
    *
    * Enables or disables queue threads depending on remaining items in queue.
+   *
+   * @var \Drupal\ultimate_cron\Entity\CronJob $job
    */
   public function throttle($job) {
     if (!empty($job->hook['settings']['queue']['master'])) {
       // We always base the threads on the master.
-      $master_job = ultimate_cron_job_load($job->hook['settings']['queue']['master']);
+      $master_job = CronJob::load($job->hook['settings']['queue']['master']);
       $settings = $master_job->getSettings('settings');
     }
     else {
       return;
     }
     if ($settings['queue']['throttle']) {
-      $queue = DrupalQueue::get($settings['queue']['name']);
+      $queue = Drupal::queue($settings['queue']['name']);
       $items = $queue->numberOfItems();
       $thread = $job->hook['settings']['queue']['thread'];
 
       $name = $master_job->name . '_' . $thread;
       $status = empty($master_job->disabled) && ($items >= ($thread - 1) * $settings['queue']['threshold']);
       $new_status = !$status ? TRUE : FALSE;
-      $old_status = ultimate_cron_job_get_status($name) ? TRUE : FALSE;
+      $old_status = !empty($name) ? TRUE : FALSE;
       if ($old_status !== $new_status) {
         $log_entry = $job->startLog(uniqid($job->id(), TRUE), 'throttling', ULTIMATE_CRON_LOG_TYPE_ADMIN);
         $log_entry->log($job->id(), 'Job @status by queue throttling (items:@items, boundary:@boundary, threshold:@threshold)', array(
@@ -370,7 +379,7 @@ class QueueSettings extends TaggedSettings {
         ), RfcLogLevel::INFO);
         $log_entry->finish();
         $job->dont_log = TRUE;
-        ultimate_cron_job_set_status($job, $new_status);
+        $job->setStatus($new_status);
         $job->disabled = $new_status;
       }
     }
