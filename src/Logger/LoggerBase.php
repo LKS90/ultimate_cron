@@ -5,9 +5,9 @@
  */
 namespace Drupal\ultimate_cron\Logger;
 use Drupal\Core\Logger\RfcLogLevel;
-use Drupal\Core\Url;
 use Drupal\ultimate_cron\CronPlugin;
-use Drupal\ultimate_cron\Logger\LogEntry;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerTrait;
 
 /**
  * Abstract class for Ultimate Cron loggers
@@ -25,8 +25,9 @@ use Drupal\ultimate_cron\Logger\LogEntry;
  *     - The class name of the log entry class associated with this logger.
  */
 abstract class LoggerBase extends CronPlugin implements LoggerInterface {
+  use LoggerTrait;
   static public $log_entries = NULL;
-  public $logEntryClass = '\Drupal\ultimate_cron\Logger\LogEntry';
+  public $logEntryClass = '\Drupal\ultimate_cron\Logger\CronChannel';
 
   /**
    * {@inheritdoc}
@@ -52,7 +53,7 @@ abstract class LoggerBase extends CronPlugin implements LoggerInterface {
   /**
    * {@inheritdoc}
    */
-  public function catchMessages(LogEntry $log_entry) {
+  public function catchMessages(CronChannel $log_entry) {
     $class = get_class($this);
     if (!isset($class::$log_entries)) {
       $class::$log_entries = array();
@@ -69,7 +70,7 @@ abstract class LoggerBase extends CronPlugin implements LoggerInterface {
   /**
    * {@inheritdoc}
    */
-  public function unCatchMessages(LogEntry $log_entry) {
+  public function unCatchMessages(CronChannel $log_entry) {
     $class = get_class($this);
     unset($class::$log_entries[$log_entry->lid]);
   }
@@ -80,7 +81,7 @@ abstract class LoggerBase extends CronPlugin implements LoggerInterface {
    * @param LogEntry $log_entry
    *   Watchdog log entry array.
    */
-  final static public function hook_watchdog(LogEntry $log_entry) {
+  final static public function hook_watchdog(CronChannel $log_entry) {
     if (static::$log_entries) {
       foreach (static::$log_entries as $log_entry_object) {
         $log_entry_object->watchdog($log_entry);
@@ -89,23 +90,12 @@ abstract class LoggerBase extends CronPlugin implements LoggerInterface {
   }
 
   /**
-   * Log to ultimate cron logs only.
-   *
-   * @param string $type
-   *   Category of the message.
-   * @param string $message
-   *   The message to store in the log. Keep $message translatable.
-   * @param array $variables
-   *   The variables for $message string to replace.
-   * @param RfcLogLevel $severity
-   *   (optional) The severity of th event.
-   * @param Url $link
-   *   A link to associate with the message.
+   * {@inheritdoc}
    */
-  final static public function log($type, $message, array $variables = [], RfcLogLevel $severity = NULL, Url $link = NULL) {
+  public function log($severity, $message, array $context = []) {
     if (static::$log_entries) {
       foreach (static::$log_entries as $log_entry_object) {
-        $log_entry_object->log($type, $message, $variables, $severity, $link);
+        $log_entry_object->log($severity, $message, $context);
       }
     }
   }
@@ -124,7 +114,7 @@ abstract class LoggerBase extends CronPlugin implements LoggerInterface {
   /**
    * {@inheritdoc}
    */
-  public function catchMessagesShutdown(LogEntry $log_entry) {
+  public function catchMessagesShutdown(CronChannel $log_entry) {
     $this->unCatchMessages($log_entry);
 
     if ($log_entry->finished) {

@@ -7,6 +7,7 @@
 namespace Drupal\ultimate_cron\Plugin\ultimate_cron\Logger;
 
 use Drupal\ultimate_cron\Logger\LoggerBase;
+use Psr\Log\LoggerTrait;
 
 /**
  * Cache Logger.
@@ -18,8 +19,9 @@ use Drupal\ultimate_cron\Logger\LoggerBase;
  * )
  */
 class CacheLogger extends LoggerBase {
+  use LoggerTrait;
 
-  public $logEntryClass = '\Drupal\ultimate_cron\Logger\CacheLogEntry';
+  public $logEntryClass = '\Drupal\ultimate_cron\Logger\CacheLogChannel';
 
   /**
    * {@inheritdoc}

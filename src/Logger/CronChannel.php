@@ -1,13 +1,16 @@
 <?php
 /**
  * @file
- * Contains \Drupal\ultimate_cron\Logger\LogEntry.
+ * Contains \Drupal\ultimate_cron\Logger\CronChannel.
  */
 
 namespace Drupal\ultimate_cron\Logger;
 
 use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Core\Logger\LoggerChannel;
 use Drupal\Core\Logger\RfcLogLevel;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerTrait;
 
 /**
  * Abstract class for Ultimate Cron log entries.
@@ -22,7 +25,8 @@ use Drupal\Core\Logger\RfcLogLevel;
  *   $log_entry_size
  *     - The maximum number of characters of the message in the log entry.
  */
-abstract class LogEntry {
+abstract class CronChannel extends LoggerChannel implements LoggerInterface {
+  use LoggerTrait;
   public $lid = NULL;
   public $name = '';
   public $log_type = ULTIMATE_CRON_LOG_TYPE_NORMAL;
@@ -109,53 +113,19 @@ abstract class LogEntry {
   }
 
   /**
-   * Implements hook_watchdog().
-   *
-   * Capture watchdog message and append it to the log entry.
+   * {@inheritdoc}
    */
-  public function watchdog(array $log_entry) {
-    if (isset($log_entry['variables']) && is_array($log_entry['variables'])) {
-      $this->message .= t($log_entry['message'], $log_entry['variables']) . "\n";
-    }
-    else {
-      $this->message .= $log_entry['message'];
-    }
-    if ($this->severity < 0 || $this->severity > $log_entry['severity']) {
-      $this->severity = $log_entry['severity'];
-    }
-    // Make sure that message doesn't become too big.
-    if (mb_strlen($this->message) > $this->log_entry_size) {
-      while (mb_strlen($this->message) > $this->log_entry_size) {
-        $firstline = mb_strpos(rtrim($this->message, "\n"), "\n");
-        if ($firstline === FALSE || $firstline == mb_strlen($this->message)) {
-          // Only one line? That's a big line ... truncate it without mercy!
-          $this->message = mb_substr($this->message, -$this->log_entry_size);
-          break;
-        }
-        $this->message = substr($this->message, $firstline + 1);
-      }
-      $this->message = '.....' . $this->message;
-    }
-  }
-
-  /**
-   * Re-implementation of watchdog().
-   *
-   * @see watchdog()
-   */
-  public function log($type, $message, $variables = array(), $severity = RfcLogLevel::NOTICE, $link = NULL) {
+  public function log($level, $message, array $context = array()) {
     global $user, $base_root;
 
     // The user object may not exist in all conditions, so 0 is substituted if needed.
     $user_uid = isset($user->uid) ? $user->uid : 0;
 
     // Prepare the fields to be logged.
-    $log_entry = array(
-      'type' => $type,
+    $context += array(
+      'type' => 'Ultimate Cron',
       'message' => $message,
-      'variables' => $variables,
-      'severity' => $severity,
-      'link' => $link,
+      'severity' => $level,
       'user' => $user,
       'uid' => $user_uid,
       'request_uri' => $base_root . \Drupal::requestStack()->getCurrentRequest()->getUri(),
@@ -164,7 +134,7 @@ abstract class LogEntry {
       // Request time isn't accurate for long processes, use time() instead.
       'timestamp' => time(),
     );
-    $this->watchdog($log_entry);
+    parent::log($level, $message, $context);
   }
 
   /**

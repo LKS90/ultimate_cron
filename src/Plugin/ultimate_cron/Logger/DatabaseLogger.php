@@ -7,10 +7,11 @@
  */
 namespace Drupal\ultimate_cron\Plugin\ultimate_cron\Logger;
 
-use Database;
-use Drupal\ultimate_cron\Logger\DatabaseLogEntry;
+use Drupal\Core\Database\Database;
+use Drupal\ultimate_cron\Logger\DatabaseLogChannel;
 use Drupal\ultimate_cron\Logger\LoggerBase;
 use PDO;
+use Psr\Log\LoggerTrait;
 
 /**
  * Database logger.
@@ -23,8 +24,9 @@ use PDO;
  * )
  */
 class DatabaseLogger extends LoggerBase {
+  use LoggerTrait;
   public $options = array();
-  public $logEntryClass = '\Drupal\ultimate_cron\Logger\DatabaseLogEntry';
+  public $logEntryClass = '\Drupal\ultimate_cron\Logger\DatabaseLogChannel';
 
   const CLEANUP_METHOD_DISABLED = 1;
   const CLEANUP_METHOD_EXPIRE = 2;
@@ -227,7 +229,7 @@ class DatabaseLogger extends LoggerBase {
       $log_entry->finished = TRUE;
     }
     else {
-      $log_entry = new DatabaseLogEntry($name, $this);
+      $log_entry = new DatabaseLogChannel($name, $this);
     }
     return $log_entry;
   }

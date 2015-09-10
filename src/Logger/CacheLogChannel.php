@@ -1,12 +1,12 @@
 <?php
 /**
  * @file
- * Contains \Drupal\ultimate_cron\Logger\CacheLogEntry.
+ * Contains \Drupal\ultimate_cron\Logger\CacheLogChannel.
  */
 namespace Drupal\ultimate_cron\Logger;
 
 
-class CacheLogEntry extends LogEntry {
+class CacheLogChannel extends CronChannel {
   /**
    * Save log entry.
    */

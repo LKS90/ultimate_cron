@@ -1,14 +1,14 @@
 <?php
 /**
  * @file
- * Contains \Drupal\ultimate_cron\Logger\DatabaseLogEntry.
+ * Contains \Drupal\ultimate_cron\Logger\DatabaseLogChannel.
  */
 
 namespace Drupal\ultimate_cron\Logger;
 
 use Drupal\Core\Logger\RfcLogLevel;
 
-class DatabaseLogEntry extends LogEntry {
+class DatabaseLogChannel extends CronChannel {
 
   /**
    * Save log entry.
